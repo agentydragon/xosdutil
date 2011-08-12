@@ -5,6 +5,7 @@
 #include <sys/sysinfo.h>
 #include "xosdutil.h"
 #include "uptime_renderer.h"
+#include "log.h"
 
 typedef struct uptime_renderer_data {
 	xosd* osd;
@@ -24,11 +25,11 @@ static int initialize(void** r, const void* arguments, uint64_t argumentsSize) {
 		if (create_xosd(&data->osd, 2) == 0) {
 			*r = data;
 		} else {
-			fprintf(stderr, "Failed to xosd_create.\n");
+			msg("Failed to xosd_create.\n");
 			f = 2;
 		}
 	} else {
-		fprintf(stderr, "Failed to allocate uptime renderer data.\n");
+		msg("Failed to allocate uptime renderer data.\n");
 		f = 1;
 	}
 	return f;
@@ -70,19 +71,18 @@ static int tick(void* r) {
 		} else {
 			pos += snprintf(buffer + pos, len - pos, "%d:%02d", upminutes, upsecs);
 		}
-		printf("xosd_display\n");
 		if (xosd_display(_r->osd, 0, XOSD_string, buffer) < pos) {
-			fprintf(stderr, "xosd_display failed: %s\n", xosd_error);
+			msg("xosd_display failed: %s\n", xosd_error);
 			f = 1;
 		}
 		
 		pos = snprintf(buffer, len, "load avg: %.2f %.2f %.2f", (double)(_r->si.loads[0])/65536.0, (double)(_r->si.loads[1])/65536.0, (double)(_r->si.loads[2])/65536.0);
 		if (xosd_display(_r->osd, 1, XOSD_string, buffer) < pos) {
-			fprintf(stderr, "xosd_display failed: %s\n", xosd_error);
+			msg("xosd_display failed: %s\n", xosd_error);
 			f = 1;
 		}
 	} else {
-		fprintf(stderr, "Uptime tick failed, as the OSD window or the renderer is not initialized.\n");
+		msg("Uptime tick failed, as the OSD window or the renderer is not initialized.\n");
 		f = 1;
 	}
 	return f;
@@ -93,18 +93,16 @@ static int show(void* r, xosd** osd) {
 	uptime_renderer_data* _r = r;
 
 	if (_r && _r->osd) {
-		printf("xosd_show\n");
 		if (xosd_show(_r->osd) == 0) {
 			*osd = _r->osd;
 		} else {
-			fprintf(stderr, "xosd_show failed: %s\n", xosd_error);
+			msg("xosd_show failed: %s\n", xosd_error);
 			f = 1;
 		}
 	} else {
-		fprintf(stderr, "Error: showing an uninitialized uptime renderer.\n");
+		msg("Error: showing an uninitialized uptime renderer.\n");
 		f = 1;
 	}
-	printf("show -> %d\n", f);
 	return f;
 }
 
@@ -113,13 +111,12 @@ static int hide(void* r) {
 	uptime_renderer_data* _r = r;
 
 	if (_r && _r->osd) {
-		printf("xosd_hide\n");
 		if (xosd_hide(_r->osd) != 0) {
-			fprintf(stderr, "xosd_hide failed: %s\n", xosd_error);
+			msg("xosd_hide failed: %s\n", xosd_error);
 			f = 1;
 		}
 	} else {
-		fprintf(stderr, "Error: hiding an uninitialized uptime renderer.\n");
+		msg("Error: hiding an uninitialized uptime renderer.\n");
 		f = 1;
 	}
 	return f;

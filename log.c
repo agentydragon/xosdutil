@@ -7,8 +7,11 @@
 static FILE* log_file = NULL;
 
 static void log_start() {
-	log_file = fopen(CONF_DIR "/xosdutil.log", "w");
+	char name[100];
+	snprintf(name, 100, "%s/xosdutil.log", conf_dir);
+	log_file = fopen(name, "w");
 	if (!log_file) {
+		perror("fopen");
 		fprintf(stderr, "Can't open log file!\n");
 		exit(1);
 	}

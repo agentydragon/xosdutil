@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "renderer.h"
+#include "log.h"
 
 int renderer_initialize(renderer** r, const renderer_api* api, const void* arguments, uint64_t argumentsSize) {
 	int f = 0;
@@ -13,12 +14,12 @@ int renderer_initialize(renderer** r, const renderer_api* api, const void* argum
 		if (_r->api->initialize && _r->api->initialize(&_r->opaque, arguments, argumentsSize) == 0) {
 			*r = _r;
 		} else {
-			fprintf(stderr, "Renderer initialization failed.\n");
+			msg("Renderer initialization failed.\n");
 			free(_r);
 			_r = NULL;
 		}
 	} else {
-		fprintf(stderr, "Failed to allocate memory for renderer.\n");
+		msg("Failed to allocate memory for renderer.\n");
 		*r = NULL;
 		f = 1;
 	}
@@ -39,7 +40,7 @@ void renderer_destroy(renderer** r) {
 int renderer_tick(renderer* r) {
 	int f = 0;
 	if (!r || !r->api || !r->api->tick) {
-		fprintf(stderr, "renderer_tick called on incomplete renderer.\n");
+		msg("renderer_tick called on incomplete renderer.\n");
 	} else {
 		f = r->api->tick(r->opaque);
 	}
@@ -49,11 +50,10 @@ int renderer_tick(renderer* r) {
 int renderer_show(renderer* r, xosd** osd) {
 	int f = 0;
 	if (!r || !r->api || !r->api->show) {
-		fprintf(stderr, "renderer_show called on incomplete renderer.\n");
+		msg("renderer_show called on incomplete renderer.\n");
 	} else {
 		f = r->api->show(r->opaque, osd);
 	}
-	printf("r_show -> %d\n", f);
 	return f;
 }
 
