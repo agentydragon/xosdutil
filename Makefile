@@ -1,9 +1,9 @@
 CC = gcc
-CFLAGS = `xosd-config --cflags --libs` -Wall -pedantic -g
+CFLAGS = `xosd-config --cflags --libs` -Wall -pedantic -g -std=c99
 COMPILE = $(CC) $(CFLAGS) -c
 OBJFILES := $(patsubst %.c,%.o,$(wildcard *.c))
 
-xosdutil: xosdutil.o uptime.o
+xosdutil: $(OBJFILES)
 	$(CC) $(CFLAGS) -o $@ $(OBJFILES)
 
 %.o: %.c
