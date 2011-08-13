@@ -2,3 +2,10 @@ TODOs:
 - Proper takebacks in renderer constructors.
 - Redirect stdout to log file in child process.
 - Fork off when launching renderers.
+- Allow custom strftime arguments in time renderer.
+- Allow passing arguments to renderers in commands.
+
+Renderers:
+- Complete battery status renderer.
+- Inbound mail headers renderer
+- Shell command output renderer
