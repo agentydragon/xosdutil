@@ -4,7 +4,7 @@
 #include <xosd.h>
 #include <time.h>
 #include "xosdutil.h"
-#include "time_renderer.h"
+#include "renderers/time.h"
 #include "log.h"
 
 typedef struct time_renderer_data {

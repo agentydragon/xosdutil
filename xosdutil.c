@@ -13,8 +13,8 @@
 #include <memory.h>
 #include <pwd.h>
 #include "renderer.h"
-#include "uptime_renderer.h"
-#include "time_renderer.h"
+#include "renderers/uptime.h"
+#include "renderers/time.h"
 #include "log.h"
 #include "xosdutil.h"
 
@@ -212,11 +212,6 @@ int main(int argc, const char** argv) {
 	xosd_set_bar_length(osd, 50);
 	xosd_display(osd, 1, XOSD_percentage, 77);
 	xosd_display(osd, 2, XOSD_slider, 77);
-	sleep(1);
-	xosd_scroll(osd, 1);
-	xosd_display(osd, 0, XOSD_string, "Žluťoučký kůň úpěl ďábelské ódy.");
-	sleep(1);
-	xosd_scroll(osd, 1);
-		*/
+	*/
 	return f;
 }

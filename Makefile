@@ -1,17 +1,17 @@
 CC = gcc
-CFLAGS = `xosd-config --cflags --libs` -Wall -pedantic -g -std=c99
+CFLAGS = `xosd-config --cflags --libs` -Wall -pedantic -g -std=c99 -I.
 COMPILE = $(CC) $(CFLAGS) -c
-OBJFILES := $(patsubst %.c,%.o,$(wildcard *.c))
+OBJFILES := $(patsubst %.c,obj/%.o,$(wildcard *.c renderers/*.c))
 
-xosdutil: $(OBJFILES)
+bin/xosdutil: $(OBJFILES)
 	$(CC) $(CFLAGS) -o $@ $(OBJFILES)
 
-%.o: %.c
+obj/%.o: %.c
 	$(COMPILE) -o $@ $<
 
 clean:
-	@rm xosdutil $(OBJFILES)
+	@rm bin/xosdutil $(OBJFILES)
 
-all: xosdutil
+all: bin/xosdutil
 
 .PHONY: clean

@@ -4,7 +4,7 @@
 #include <xosd.h>
 #include <sys/sysinfo.h>
 #include "xosdutil.h"
-#include "uptime_renderer.h"
+#include "renderers/uptime.h"
 #include "log.h"
 
 typedef struct uptime_renderer_data {
