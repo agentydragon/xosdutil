@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <xosd.h>
@@ -61,7 +60,7 @@ static int tick(void* r) {
 		strftime(buffer, 100, "%a %d.%m.%y %H:%M:%S", tmp);
 		if (xosd_display(_r->osd, 0, XOSD_string, buffer) < pos) {
 			msg("xosd_display failed: %s\n", xosd_error);
-			f = 1;
+			f = 2;
 		}
 	} else {
 		msg("Time tick failed, as the OSD window or the renderer is not initialized.\n");
@@ -79,7 +78,7 @@ static int show(void* r, xosd** osd) {
 			*osd = _r->osd;
 		} else {
 			msg("xosd_show failed: %s\n", xosd_error);
-			f = 1;
+			f = 2;
 		}
 	} else {
 		msg("Error: showing an uninitialized time renderer.\n");

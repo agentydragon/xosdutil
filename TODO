@@ -1,0 +1,4 @@
+TODOs:
+- Proper takebacks in renderer constructors.
+- Redirect stdout to log file in child process.
+- Fork off when launching renderers.

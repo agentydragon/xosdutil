@@ -13,44 +13,45 @@
 #include <memory.h>
 #include <pwd.h>
 #include "renderer.h"
-#include "renderers/uptime.h"
 #include "renderers/time.h"
+#include "renderers/uptime.h"
+#include "renderers/battery.h"
 #include "log.h"
 #include "xosdutil.h"
 
 static bool run = true;
 static int pipe_fd;
 static xosd *osd;
-static enum { UPTIME, TIME, RENDERER_COUNT };
+static enum { UPTIME, TIME, BATTERY, RENDERER_COUNT };
+const renderer_api* apis[RENDERER_COUNT] = { &uptime_renderer, &time_renderer, &battery_renderer };
 static renderer **renderers;
 static char fifo_name[100];
 char conf_dir[100];
 
 int create_xosd(xosd** osd, int size) {
-xosd* _osd;
-int f = 0;
+	xosd* _osd;
+	int f = 0;
 
-if ((_osd = xosd_create(size)) != NULL) {
-	xosd_set_font(_osd, "-b&h-luxi mono-bold-r-*-*-80-*-*-*-*-*-*");
-	xosd_set_shadow_offset(_osd, 2);
-	xosd_set_colour(_osd, "yellow");
-	xosd_set_outline_offset(_osd, 2);
-	xosd_set_outline_colour(_osd, "black");
-	xosd_set_pos(_osd, XOSD_bottom);
-	xosd_set_vertical_offset(_osd, 48);
-	xosd_set_align(_osd, XOSD_center);
-	*osd = _osd;
-} else {
-	msg("xosd_create failed\n");
-	f = 1;
-}
-
-return f;
+	if ((_osd = xosd_create(size)) != NULL) {
+		xosd_set_font(_osd, "-b&h-luxi mono-bold-r-*-*-80-*-*-*-*-*-*");
+		xosd_set_shadow_offset(_osd, 2);
+		xosd_set_colour(_osd, "yellow");
+		xosd_set_outline_offset(_osd, 2);
+		xosd_set_outline_colour(_osd, "black");
+		xosd_set_pos(_osd, XOSD_bottom);
+		xosd_set_vertical_offset(_osd, 48);
+		xosd_set_align(_osd, XOSD_center);
+		*osd = _osd;
+	} else {
+		msg("xosd_create failed\n");
+		f = 1;
+	}
+	return f;
 }
 
 static void check_configuration_directory() {
-struct stat result;
-struct passwd* pwentry = getpwuid(getuid());
+	struct stat result;
+	struct passwd* pwentry = getpwuid(getuid());
 	snprintf(conf_dir, 100, "%s/.xosdutil", pwentry->pw_dir);
 	snprintf(fifo_name, 100, "%s/xosdutilctl", conf_dir);
 
@@ -93,7 +94,6 @@ static void open_pipe() {
 }
 
 static void initialize_renderers() {
-	const renderer_api* apis[2] = { &uptime_renderer, &time_renderer };
 	renderers = malloc(sizeof(renderer*)*RENDERER_COUNT);
 	
 	for (int i=0; i<RENDERER_COUNT; i++) 
@@ -120,6 +120,8 @@ static void parse_command(const char* command) {
 		run_renderer(renderers[UPTIME], 5);
 	} else if (strcmp(command, "time") == 0) {
 		run_renderer(renderers[TIME], 5);
+	} else if (strcmp(command, "battery") == 0) {
+		run_renderer(renderers[BATTERY], 3);
 	}
 }
 
