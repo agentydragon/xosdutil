@@ -1,0 +1,32 @@
+xosd_settings:
+{
+	font = "-b&h-luxi mono-bold-r-*-*-80-*-*-*-*-*-*";
+	shadow_offset = 2;
+	color = "yellow";
+	outline_offset = 2;
+	outline_color = "black";
+	position = "bottom";
+	vertical_offset = 48;
+	align = "center";
+}
+
+renderers = [
+	{
+		command = "time";
+		renderer = "time";
+		arguments: {
+			format = "%S";
+		};
+	},
+	{
+		command = "uptime";
+		renderer = "uptime";
+	},
+	{
+		command = "time2";
+		renderer = "time";
+		arguments: {
+			format = "%m:%S";
+		};
+	}
+]

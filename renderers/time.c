@@ -8,28 +8,47 @@
 
 typedef struct time_renderer_data {
 	xosd* osd;
+	char* time_format;
 } time_renderer_data;
 
 static int tick(void*);
 static int hide(void*);
 
+/**
+ * Arguments: NULL or format for strftime
+ */
 static int initialize(void** r, const void* arguments, uint64_t argumentsSize) {
 	int f = 0;
 	time_renderer_data* data;
 
 	data = malloc(sizeof(time_renderer_data));
-	if (data) {
-		memset(data, 0, sizeof(time_renderer_data));
-		if (create_xosd(&data->osd, 1) == 0) {
-			*r = data;
-		} else {
-			msg("Failed to xosd_create.\n");
-			f = 2;
-		}
-	} else {
+	if (!data) {
 		msg("Failed to allocate time renderer data.\n");
-		f = 1;
+		goto err_1;
 	}
+	memset(data, 0, sizeof(time_renderer_data));
+	if (create_xosd(&data->osd, 1) != 0) {
+		msg("Failed to xosd_create.\n");
+		goto err_2;
+	}
+	if (argumentsSize) {
+		data->time_format = malloc(sizeof(argumentsSize));
+		if (!data->time_format) {
+			goto err_3;
+		}
+		memcpy(data->time_format, arguments, argumentsSize);
+	}
+	*r = data;
+
+	goto out;
+
+err_3:
+	// xosd_destroy
+err_2:
+	free(data);
+err_1:
+	f = 1;
+out:
 	return f;
 }
 
@@ -57,7 +76,7 @@ static int tick(void* r) {
 	if (_r && _r->osd) {
 		t = time(NULL);
 		tmp = localtime(&t);
-		strftime(buffer, 100, "%a %d.%m.%y %H:%M:%S", tmp);
+		strftime(buffer, 100, _r->time_format ? _r->time_format : "%c", tmp);
 		if (xosd_display(_r->osd, 0, XOSD_string, buffer) < pos) {
 			msg("xosd_display failed: %s\n", xosd_error);
 			f = 2;

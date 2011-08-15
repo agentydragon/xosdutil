@@ -12,6 +12,7 @@
 #include <string.h>
 #include <memory.h>
 #include <pwd.h>
+#include <libconfig.h>
 #include "renderer.h"
 #include "renderers/time.h"
 #include "renderers/uptime.h"
@@ -22,10 +23,9 @@
 static bool run = true;
 static int pipe_fd;
 static xosd *osd;
-static enum { UPTIME, TIME, BATTERY, RENDERER_COUNT };
-const renderer_api* apis[RENDERER_COUNT] = { &uptime_renderer, &time_renderer, &battery_renderer };
 static renderer **renderers;
 static char fifo_name[100];
+static char conf_file[100];
 char conf_dir[100];
 
 int create_xosd(xosd** osd, int size) {
@@ -57,15 +57,44 @@ static void check_configuration_directory() {
 
 	if (stat(conf_dir, &result) < 0) {
 		if (mkdir(conf_dir, 0755) < 0) {
-			fprintf(stderr,"Cannot create my work directory (%s).\n", conf_dir);
+			fprintf(stderr, "Cannot create my work directory (%s).\n", conf_dir);
 			perror("mkdir");
 			exit(EXIT_FAILURE);
 		}
 	} else {
 		if (!S_ISDIR(result.st_mode)) {
-			fprintf(stderr,"Please, delete %s and let me use it as my own directory.\n", conf_dir);
+			fprintf(stderr, "Please, delete %s and let me use it as my own directory.\n", conf_dir);
 			exit(EXIT_FAILURE);
 		}
+	}
+}
+
+static void load_default_configuration() {
+	renderers = malloc(sizeof(renderer*)*2);
+	const char time_format[] = "%a %d.%m.%y %H:%M:%S";
+	renderer_initialize(&renderers[0], &time_renderer, NULL, 0);
+	renderer_initialize(&renderers[1], &uptime_renderer, time_format, strlen(time_format));
+	renderer_initialize(&renderers[2], &battery_renderer, NULL, 0);
+}
+
+// TODO
+static void parse_configuration(config_t *config) {
+}
+
+static void load_configuration() {
+	struct stat result;
+	config_t config;
+	snprintf(conf_file, 100, "%s/xosdutil.cfg", conf_dir);
+	if (stat(conf_file, &result) < 0 || !S_ISREG(result.st_mode) || access(conf_file, R_OK) != 0) {
+		msg("Cannot open configuration file at %s, continuing with default settings...", conf_file);
+		load_default_configuration();
+	} else {
+		config_init(&config);
+		if (config_read_file(&config, conf_file) != CONFIG_TRUE) {
+			msg("Cannot parse configuration file (error from libconfig: %s), continuing with default settings...", config_error_text(&config));
+		}
+		parse_configuration(&config);
+		config_destroy(&config);
 	}
 }
 
@@ -93,16 +122,6 @@ static void open_pipe() {
 	}
 }
 
-static void initialize_renderers() {
-	renderers = malloc(sizeof(renderer*)*RENDERER_COUNT);
-	
-	for (int i=0; i<RENDERER_COUNT; i++) 
-		if (renderer_initialize(&renderers[i], apis[i], NULL, 0) != 0) {
-			msg("Renderer failed to initialize.\n");
-			exit(1);
-		}
-}
-
 static void run_renderer(renderer* r, int time) {
 	renderer_show(r, &osd);
 	while (time--) {
@@ -117,11 +136,11 @@ static void parse_command(const char* command) {
 	if (strcmp(command, "exit") == 0) {
 		run = false;
 	} else if (strcmp(command, "uptime") == 0) {
-		run_renderer(renderers[UPTIME], 5);
+		run_renderer(renderers[1], 5);
 	} else if (strcmp(command, "time") == 0) {
-		run_renderer(renderers[TIME], 5);
+		run_renderer(renderers[0], 5);
 	} else if (strcmp(command, "battery") == 0) {
-		run_renderer(renderers[BATTERY], 3);
+		run_renderer(renderers[2], 3);
 	}
 }
 
@@ -202,9 +221,9 @@ int main(int argc, const char** argv) {
 
 	// Running in the child process now.
 	
+	load_configuration();
 	open_pipe();
 	atexit(close_pipe);
-	initialize_renderers();
 
 	while (run) {
 		select_pipe();
