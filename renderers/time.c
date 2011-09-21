@@ -38,9 +38,11 @@ static int initialize(void** r, const void* arguments, uint64_t argumentsSize) {
 			goto err_3;
 		}
 		const char* buffer = NULL;
-		config_setting_lookup_string(arguments, "format", &buffer);
-		if (buffer) {
+		if (config_setting_lookup_string(arguments, "format", &buffer) && buffer) {
 			data->time_format = strdup(buffer);
+			msg("Time format wanted: %s\n", data->time_format);
+		} else {
+			msg("Invalid time format.\n");
 		}
 	}
 	*r = data;

@@ -36,7 +36,7 @@ static int shadow_offset = 2;
 static int outline_offset = 2;
 static const char* outline_color = "black";
 static int vertical_offset = 48;
-static bool daemonize = false;
+static bool daemonize = true;
 
 int create_xosd(xosd** osd, int size) {
 	xosd* _osd;
@@ -128,7 +128,7 @@ static int parse_command_setting(config_setting_t *settings) {
 		return -1;
 	}
 	// TODO check
-	return renderer_initialize(&renderers[renderers_count-1], api, &command, sizeof(config_setting_t*));
+	return renderer_initialize(&renderers[renderers_count-1], api, settings, sizeof(settings));
 }
 
 // TODO
