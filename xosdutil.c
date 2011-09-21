@@ -16,6 +16,7 @@
 #include "renderers/time.h"
 #include "renderers/uptime.h"
 #include "renderers/battery.h"
+#include "renderers/exec.h"
 #include "log.h"
 #include "xosdutil.h"
 
@@ -36,7 +37,7 @@ static int shadow_offset = 2;
 static int outline_offset = 2;
 static const char* outline_color = "black";
 static int vertical_offset = 48;
-static bool daemonize = true;
+static bool daemonize = false;
 
 int create_xosd(xosd** osd, int size) {
 	xosd* _osd;
@@ -123,8 +124,10 @@ static int parse_command_setting(config_setting_t *settings) {
 		api = &uptime_renderer;
 	} else if (strcmp(name, "battery") == 0) {
 		api = &battery_renderer;
+	} else if (strcmp(name, "exec") == 0) {
+		api = &exec_renderer;
 	} else {
-		msg("unknown renderer: %s", name);
+		msg("Unknown renderer: %s. No effect.\n", name);
 		return -1;
 	}
 	// TODO check
@@ -248,7 +251,7 @@ static void select_pipe() {
 	switch (select(pipe_fd + 1, &readfds, &writefds, &exceptfds, &timeout)) {
 		case 1:
 			// The file descriptor is now ready to read.
-			if (length == capacity) {
+			if (length >= capacity) {
 				capacity *= 2;
 				if (!capacity) capacity = 1;
 				buffer = realloc(buffer, capacity);
@@ -264,11 +267,23 @@ static void select_pipe() {
 				exit(1);
 			} else {
 				length += nbytes;
-				if ((token = strchr(buffer, '\n')) != NULL) {
-					*token = '\0';
-					parse_command(buffer);
-					memmove(buffer, token + 1, token - buffer + 1);
-					length -= (token - buffer + 1);
+				if (length >= capacity) {
+					capacity *= 2;
+					if (!capacity) capacity = 1;
+					buffer = realloc(buffer, capacity);
+					if (!buffer) {
+						msg("Ran out of memory resizing command buffer.\n");
+						exit(1);
+					}
+					buffer[length] = '\0';
+				}
+				for (int i = 0; i < length; i++) {
+					if (buffer[i] == '\n') {
+						buffer[i] = '\0';
+						parse_command(buffer);
+						memmove(buffer, buffer + i + 1, length - i);
+						length -= (i + 1);
+					}
 				}
 			}
 			break;
@@ -316,7 +331,6 @@ int main(int argc, const char** argv) {
 		select_pipe();
 	}
 	/*
-	"-adobe-new century schoolbook-medium-r-*--60-*-*-*-*-*-*", "-b&h-lucida-medium-r-*-*-70-*-*-*-*-*-*", "-b&h-luxi mono-medium-r-*-*-60-*-*-*-*-*-*", "-b&h-luxi sans-medium-r-*-*-70-*-*-*-*-*-*"
 	xosd_set_bar_length(osd, 50);
 	xosd_display(osd, 1, XOSD_percentage, 77);
 	xosd_display(osd, 2, XOSD_slider, 77);

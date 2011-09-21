@@ -27,6 +27,12 @@ commands = (
 		renderer = "time";
 		format = "%m:%S";
 		duration = 3;
+	},
+	{
+		command = "acpi";
+		renderer = "exec";
+		run = "acpi";
+		duration = 5;
 	}
 )
 
