@@ -2,6 +2,7 @@
 #include <string.h>
 #include <xosd.h>
 #include <time.h>
+#include <libconfig.h>
 #include "xosdutil.h"
 #include "renderers/time.h"
 #include "log.h"
@@ -15,7 +16,7 @@ static int tick(void*);
 static int hide(void*);
 
 /**
- * Arguments: NULL or format for strftime
+ * Arguments: NULL or config_setting_t*
  */
 static int initialize(void** r, const void* arguments, uint64_t argumentsSize) {
 	int f = 0;
@@ -32,11 +33,15 @@ static int initialize(void** r, const void* arguments, uint64_t argumentsSize) {
 		goto err_2;
 	}
 	if (argumentsSize) {
-		data->time_format = malloc(sizeof(argumentsSize));
-		if (!data->time_format) {
+		if (argumentsSize != sizeof(config_setting_t*)) {
+			msg("Unexpected arguments for time renderer.\n");
 			goto err_3;
 		}
-		memcpy(data->time_format, arguments, argumentsSize);
+		const char* buffer = NULL;
+		config_setting_lookup_string(arguments, "format", &buffer);
+		if (buffer) {
+			data->time_format = strdup(buffer);
+		}
 	}
 	*r = data;
 

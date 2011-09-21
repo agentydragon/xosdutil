@@ -30,6 +30,11 @@ void msg(const char* fmt, ...) {
 	if (!log_file) {
 		log_start();
 	}
+	if (debug) {
+		vprintf(fmt, ap);
+		va_end(ap);
+		va_start(ap, fmt);
+	}
 	vfprintf(log_file, fmt, ap);
 	va_end(ap);
 }
