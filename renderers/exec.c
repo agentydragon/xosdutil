@@ -5,6 +5,7 @@
 #include <libconfig.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <signal.h>
 #include "xosdutil.h"
 #include "renderers/exec.h"
 #include "log.h"
@@ -79,7 +80,15 @@ static int tick(void* r) {
 
 	if (_r && _r->osd) {
 		int pipefd[2];
-		pipe(pipefd);
+		if (pipe(pipefd) != 0) {
+			perror("pipe");
+			exit(EXIT_FAILURE);
+		}
+		struct sigaction old_action, new_action;
+		new_action.sa_handler = SIG_IGN;
+		sigemptyset(&new_action.sa_mask);
+		new_action.sa_flags = 0;
+		sigaction(SIGCHLD, &new_action, &old_action);
 		pid = fork();
 		if (pid < 0) {
 			perror("fork");
@@ -89,24 +98,29 @@ static int tick(void* r) {
 			int r = 0;
 			buffer = realloc(buffer, buffer_capacity);
 			while ((r = read(pipefd[0], buffer + buffer_length, buffer_capacity - buffer_length)) > 0) {
-				for (int i=buffer_length; i<buffer_length+r; i++) {
-					msg("%c", buffer[i]);
-				}
-				msg("\n");
 				buffer_length += r;
 				if (buffer_capacity - buffer_length < 1024) {
 					buffer_capacity *= 2;
 					buffer = realloc(buffer, buffer_capacity);
 				}
 			}
+			close(pipefd[0]);
+			msg("over.\n");
 			buffer[buffer_length] = '\0';
 		} else {
 			close(pipefd[0]);
+			int old_stdout = dup(1);
 			dup2(pipefd[1], 1);
-			system(_r->command);
+			close(pipe_fd);
+			int result = system(_r->command);
+			if (WEXITSTATUS(result) != 0) { // TODO: somehow buggy
+				dup2(old_stdout, 1);
+				msg("Warning: command %s returned %d\n", _r->command, result);
+			}
 			close(pipefd[1]);
 			exit(0);
 		}
+		sigaction(SIGCHLD, &old_action, NULL);
 
 		if (xosd_display(_r->osd, 0, XOSD_string, buffer) < buffer_length) {
 			msg("xosd_display failed: %s\n", xosd_error);

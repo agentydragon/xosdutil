@@ -1,3 +1,5 @@
+// TODO: switchable debug mode / daemon mode
+
 //#define _XOPEN_SOURCE
 #include <stdlib.h>
 #include <stdbool.h>
@@ -21,7 +23,7 @@
 #include "xosdutil.h"
 
 static bool run = true;
-static int pipe_fd;
+int pipe_fd;
 static xosd *osd;
 static renderer **renderers = NULL;
 static const char **renderer_commands = NULL;
@@ -234,7 +236,7 @@ static void parse_command(const char* command) {
 
 static void select_pipe() {
 	static size_t length = 0, capacity = 0;
-	static char* buffer = NULL, *token = NULL;
+	static char* buffer = NULL;
 	size_t nbytes = 0;
 	fd_set readfds, writefds, exceptfds;
 	struct timeval timeout;
@@ -245,9 +247,10 @@ static void select_pipe() {
 
 	FD_SET(pipe_fd, &readfds); // We want to check if the control pipe is ready for reading.
 
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 500000; // Half a second
+	timeout.tv_sec = 60;
+	timeout.tv_usec = 0; // 60 seconds
 
+	msg("select\n");
 	switch (select(pipe_fd + 1, &readfds, &writefds, &exceptfds, &timeout)) {
 		case 1:
 			// The file descriptor is now ready to read.
@@ -297,10 +300,6 @@ static void select_pipe() {
 	}
 }
 
-static void close_pipe() {
-	unlink(fifo_name);
-}
-
 int main(int argc, const char** argv) {
 	int f = 0;
 	pid_t pid;
@@ -325,11 +324,12 @@ int main(int argc, const char** argv) {
 	
 	load_configuration();
 	open_pipe();
-	atexit(close_pipe);
 
 	while (run) {
 		select_pipe();
 	}
+
+	unlink(fifo_name);
 	/*
 	xosd_set_bar_length(osd, 50);
 	xosd_display(osd, 1, XOSD_percentage, 77);

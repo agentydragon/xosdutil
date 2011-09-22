@@ -8,4 +8,3 @@ TODOs:
 Renderers:
 - Complete battery status renderer.
 - Inbound mail headers renderer
-- Shell command output renderer
