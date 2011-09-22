@@ -19,6 +19,7 @@
 #include "renderers/uptime.h"
 #include "renderers/battery.h"
 #include "renderers/exec.h"
+#include "renderers/echo.h"
 #include "log.h"
 #include "xosdutil.h"
 
@@ -128,6 +129,8 @@ static int parse_command_setting(config_setting_t *settings) {
 		api = &battery_renderer;
 	} else if (strcmp(name, "exec") == 0) {
 		api = &exec_renderer;
+	} else if (strcmp(name, "echo") == 0) {
+		api = &echo_renderer;
 	} else {
 		msg("Unknown renderer: %s. No effect.\n", name);
 		return -1;
@@ -211,8 +214,8 @@ static void open_pipe() {
 	}
 }
 
-static void run_renderer(renderer* r, int time) {
-	renderer_show(r, &osd);
+static void run_renderer(renderer* r, int time, const char* arguments) {
+	renderer_show(r, &osd, arguments);
 	while (time--) {
 		renderer_tick(r);
 		sleep(1);
@@ -221,14 +224,16 @@ static void run_renderer(renderer* r, int time) {
 }
 
 static void parse_command(const char* command) {
+	int cnt = 0;
+	while (command[cnt] && command[cnt] != ' ') cnt++;
 	msg("command received: [%s]\n", command);
 
 	if (strcmp(command, "exit") == 0) {
 		run = false;
 	} else {
 		for (int i = 0; i < renderers_count; i++) {
-			if (strcmp(renderer_commands[i], command) == 0) {
-				run_renderer(renderers[i], renderer_durations[i]);
+			if (strncmp(renderer_commands[i], command, cnt) == 0) {
+				run_renderer(renderers[i], renderer_durations[i], command[cnt] ? (command + cnt) : NULL);
 			}
 		}
 	}

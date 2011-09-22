@@ -47,12 +47,12 @@ int renderer_tick(renderer* r) {
 	return f;
 }
 
-int renderer_show(renderer* r, xosd** osd) {
+int renderer_show(renderer* r, xosd** osd, const char* arguments) {
 	int f = 0;
 	if (!r || !r->api || !r->api->show) {
 		msg("renderer_show called on incomplete renderer.\n");
 	} else {
-		f = r->api->show(r->opaque, osd);
+		f = r->api->show(r->opaque, osd, arguments);
 	}
 	return f;
 }
