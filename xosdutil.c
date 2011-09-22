@@ -232,8 +232,10 @@ static void parse_command(const char* command) {
 		run = false;
 	} else {
 		for (int i = 0; i < renderers_count; i++) {
-			if (strncmp(renderer_commands[i], command, cnt) == 0) {
+			if (strlen(renderer_commands[i]) == cnt &&
+				strncmp(renderer_commands[i], command, cnt) == 0) {
 				run_renderer(renderers[i], renderer_durations[i], command[cnt] ? (command + cnt) : NULL);
+				break;
 			}
 		}
 	}
@@ -252,7 +254,7 @@ static void select_pipe() {
 
 	FD_SET(pipe_fd, &readfds); // We want to check if the control pipe is ready for reading.
 
-	timeout.tv_sec = 60;
+	timeout.tv_sec = 600;
 	timeout.tv_usec = 0; // 60 seconds
 
 	msg("select\n");

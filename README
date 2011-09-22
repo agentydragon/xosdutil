@@ -10,7 +10,7 @@ To kill it, send it the word "exit". For a configuration file example, see xosdu
 
 Any command for xosdutil has the following:
 	- a command to respond to, e.g. "time", "whats_the_time" etc. - this is what you write in the control pipe
-	- a renderer to run, currently one of "time", "uptime" or "battery"
+	- a renderer to run, currently one of "time", "uptime", "battery", "exec" and "echo"
 		(battery doesn't work, either :)
 	- an optional duration in seconds (default: 5)
 	- arguments for the renderer
@@ -19,5 +19,21 @@ The time renderer accepts the following arguments:
 	- format: the string to pass to strftime
 
 The uptime renderer doesn't accept any arguments. It just shows the uptime in the same format as the uptime command.
+
+The exec renderer runs a command and displays its output. It has the following arguments:
+	- run: the command to run
+
+The echo renderer just displays what it's passed in the control pipe.
+Example usage:
+	commands = (
+		{
+			command = "show";
+			renderer = "echo";
+			duration = "1";
+		}
+	)
+
+	Now whenever you write "show yadayada" into the control pipe,
+	"yadayada" is displayed for 1 second.
 
 The battery renderer doesn't even work yet.

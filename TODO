@@ -2,9 +2,6 @@ TODOs:
 - Proper takebacks in renderer constructors.
 - Redirect stdout to log file in child process.
 - Fork off when launching renderers.
-- Allow passing arguments to renderers in commands.
-- Parse configuration file properly.
 
 Renderers:
 - Complete battery status renderer.
-- Inbound mail headers renderer
