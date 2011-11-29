@@ -86,6 +86,7 @@ static int tick(void* r) {
 		}
 		struct sigaction old_action, new_action;
 		new_action.sa_handler = SIG_IGN;
+		// TODO: vzniknou zombie!
 		sigemptyset(&new_action.sa_mask);
 		new_action.sa_flags = 0;
 		sigaction(SIGCHLD, &new_action, &old_action);
@@ -135,7 +136,8 @@ static int tick(void* r) {
 	return f;
 }
 
-static int show(void* r, xosd** osd) {
+static int show(void* r, xosd** osd, const char* arguments) {
+	(void) arguments;
 	int f = 0;
 	exec_renderer_data* _r = r;
 

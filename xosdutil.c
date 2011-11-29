@@ -1,5 +1,3 @@
-// TODO: switchable debug mode / daemon mode
-
 //#define _XOPEN_SOURCE
 #include <stdlib.h>
 #include <stdbool.h>
@@ -15,6 +13,7 @@
 #include <pwd.h>
 #include <string.h>
 #include <libconfig.h>
+#include <sys/wait.h>
 #include "renderers/time.h"
 #include "renderers/uptime.h"
 #include "renderers/battery.h"
@@ -22,6 +21,8 @@
 #include "renderers/echo.h"
 #include "log.h"
 #include "xosdutil.h"
+
+#define COUNTOF(x) (sizeof(x)/sizeof(*x))
 
 static bool run = true;
 int pipe_fd;
@@ -41,6 +42,12 @@ static int outline_offset = 2;
 static const char* outline_color = "black";
 static int vertical_offset = 48;
 static bool daemonize = false;
+static bool use_pipe = true;
+
+static void sigchld(int signal) {
+	int status;
+	wait(&status);
+}
 
 int create_xosd(xosd** osd, int size) {
 	xosd* _osd;
@@ -66,8 +73,14 @@ int create_xosd(xosd** osd, int size) {
 static void check_configuration_directory() {
 	struct stat result;
 	struct passwd* pwentry = getpwuid(getuid());
-	snprintf(conf_dir, 100, "%s/.xosdutil", pwentry->pw_dir);
-	snprintf(fifo_name, 100, "%s/xosdutilctl", conf_dir);
+	if (snprintf(conf_dir, COUNTOF(conf_dir), "%s/.xosdutil", pwentry->pw_dir) > COUNTOF(conf_dir)) {
+		fprintf(stderr, "Buffer overflow.\n");
+		exit(EXIT_FAILURE);
+	}
+	if (snprintf(fifo_name, COUNTOF(fifo_name), "%s/xosdutilctl", conf_dir) > COUNTOF(fifo_name)) {
+		fprintf(stderr, "Buffer overflow.\n");
+		exit(EXIT_FAILURE);
+	}
 
 	if (stat(conf_dir, &result) < 0) {
 		if (mkdir(conf_dir, 0755) < 0) {
@@ -141,6 +154,8 @@ static int parse_command_setting(config_setting_t *settings) {
 
 // TODO
 static void parse_configuration(config_t *config) {
+	// TODO: load "use_pipe"
+
 	config_setting_t* section = config_lookup(config, "display");
 	const char* buffer;
 	if (section) {
@@ -190,30 +205,6 @@ static void load_configuration() {
 	}
 }
 
-static void open_pipe() {
-	struct stat result;
-	if (stat(fifo_name, &result) < 0) {
-		if (mkfifo(fifo_name, S_IWUSR | S_IRUSR) < 0) {
-			msg("Cannot create control pipe in %s.\n", fifo_name);
-			perror("mkfifo");
-			exit(EXIT_FAILURE);
-		}
-	} else {
-		// TODO: kill all own instances and take over this.
-		if (!S_ISFIFO(result.st_mode)) {
-			msg("I have some junk in where I would expect to make my control pipe (%s). Please remove it.\n", fifo_name);
-			exit(EXIT_FAILURE);
-		}
-	}
-
-	pipe_fd = open(fifo_name, O_RDWR | O_NONBLOCK); // O_RDWR because we need at least one writer for select() to work.
-	if (pipe_fd < 0) {
-		perror("open");
-		msg("Failed to open the control pipe at %s.\n", fifo_name);
-		exit(EXIT_FAILURE);
-	}
-}
-
 static void run_renderer(renderer* r, int time, const char* arguments) {
 	renderer_show(r, &osd, arguments);
 	while (time--) {
@@ -238,6 +229,29 @@ static void parse_command(const char* command) {
 				break;
 			}
 		}
+	}
+}
+
+static void open_pipe() {
+	struct stat result;
+	if (stat(fifo_name, &result) < 0) {
+		if (mkfifo(fifo_name, S_IWUSR | S_IRUSR) < 0) {
+			msg("Cannot create control pipe in %s.\n", fifo_name);
+			perror("mkfifo");
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		if (!S_ISFIFO(result.st_mode)) {
+			msg("I have some junk in where I would expect to make my control pipe (%s). Please remove it.\n", fifo_name);
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	pipe_fd = open(fifo_name, O_RDWR | O_NONBLOCK); // O_RDWR because we need at least one writer for select() to work.
+	if (pipe_fd < 0) {
+		perror("open");
+		msg("Failed to open the control pipe at %s.\n", fifo_name);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -299,12 +313,21 @@ static void select_pipe() {
 			break;
 		case 0:
 			// TODO: How?
-			//osd_tick();
 			break;
 		case -1:
 			perror("select");
 			break;
 	}
+}
+
+static void open_socket() {
+	fprintf(stderr, "open_socket(): not implemented.\n");
+	exit(EXIT_FAILURE);
+}
+
+static void select_socket() {
+	fprintf(stderr, "select_socket(): not implemented.\n");
+	exit(EXIT_FAILURE);
 }
 
 int main(int argc, const char** argv) {
@@ -330,10 +353,24 @@ int main(int argc, const char** argv) {
 	// Running in the child process now.
 	
 	load_configuration();
-	open_pipe();
 
-	while (run) {
-		select_pipe();
+	struct sigaction sigchld_action;
+	bzero(&sigchld_action, sizeof(struct sigaction));
+	sigchld_action.sa_handler = &sigchld;
+	sigaction(SIGCHLD, &sigchld_action, NULL);
+
+	if (use_pipe) {
+		open_pipe();
+
+		while (run) {
+			select_pipe();
+		}
+	} else {
+		open_socket();
+
+		while (run) {
+			select_socket();
+		}
 	}
 
 	unlink(fifo_name);
