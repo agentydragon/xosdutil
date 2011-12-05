@@ -73,8 +73,8 @@ static void check_configuration_directory() {
 	if (snprintf(conf_dir, COUNTOF(conf_dir), "%s/.xosdutil", pwentry->pw_dir) > COUNTOF(conf_dir)) {
 		die("Buffer overflow.\n");
 	}
-	if (snprintf(fifo_name, COUNTOF(fifo_name), "%s/xosdutilctl", conf_dir) > COUNTOF(fifo_name) ||
-		snprintf(socket_name, COUNTOF(socket_name), "%s/xosdutil.socket", conf_dir) > COUNTOF(socket_name)) {
+	if ((use_pipe && snprintf(fifo_name, COUNTOF(fifo_name), "%s/xosdutilctl", conf_dir) > COUNTOF(fifo_name)) ||
+		(!use_pipe && snprintf(socket_name, COUNTOF(socket_name), "%s/xosdutil.socket", conf_dir) > COUNTOF(socket_name))) {
 		die("Buffer overflow.\n");
 	}
 
