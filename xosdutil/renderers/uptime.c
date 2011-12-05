@@ -88,7 +88,7 @@ static int tick(void* r) {
 	return f;
 }
 
-static int show(void* r, xosd** osd) {
+static int show(void* r, xosd** osd, const char* arguments) {
 	int f = 0;
 	uptime_renderer_data* _r = r;
 

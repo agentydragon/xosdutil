@@ -68,12 +68,10 @@ static void destroy(void** r) {
 }
 
 static int tick(void* r) {
-	battery_renderer_data* _r = r;
-	int f = 0;
-	return f;
+	return 0;
 }
 
-static int show(void* r, xosd** osd) {
+static int show(void* r, xosd** osd, const char* arguments) {
 	int f = 0;
 	battery_renderer_data* _r = r;
 	if (_r && _r->osd) {

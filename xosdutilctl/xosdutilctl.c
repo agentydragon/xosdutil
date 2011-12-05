@@ -70,6 +70,8 @@ int main(int argc, char** argv) {
 				break;
 			}
 		} while (1);
+		// after everything is sent, write a dummy newline.
+		write(socket_fd, "\n", 1);
 	}
 	close(socket_fd);
 	return 0;

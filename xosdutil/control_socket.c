@@ -13,7 +13,7 @@ char socket_name[100];
 void open_socket() {
 	struct stat result;
 	if (stat(socket_name, &result) >= 0) {
-		die("I have some junk in where I would expect to make my control socket (%s). Please remove it.\n", fifo_name);
+		die("I have some junk in where I would expect to make my control socket (%s). Please remove it.\n", socket_name);
 	}
 
 	socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);

@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include "log.h"
 
-static FILE* log_file = NULL;
-
 void msg(const char* fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
