@@ -4,8 +4,11 @@
 #include <locale.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
+#include <sys/socket.h>
 #include <sys/select.h>
+#include <sys/un.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
@@ -13,7 +16,6 @@
 #include <pwd.h>
 #include <string.h>
 #include <libconfig.h>
-#include <sys/wait.h>
 #include "renderers/time.h"
 #include "renderers/uptime.h"
 #include "renderers/battery.h"
@@ -32,6 +34,7 @@ static const char **renderer_commands = NULL;
 static int* renderer_durations = NULL;
 static int renderers_count = 0;
 static char fifo_name[100];
+static char socket_name[100];
 static char conf_file[100];
 char conf_dir[100];
 bool debug = true;
@@ -74,24 +77,20 @@ static void check_configuration_directory() {
 	struct stat result;
 	struct passwd* pwentry = getpwuid(getuid());
 	if (snprintf(conf_dir, COUNTOF(conf_dir), "%s/.xosdutil", pwentry->pw_dir) > COUNTOF(conf_dir)) {
-		fprintf(stderr, "Buffer overflow.\n");
-		exit(EXIT_FAILURE);
+		die("Buffer overflow.\n");
 	}
-	if (snprintf(fifo_name, COUNTOF(fifo_name), "%s/xosdutilctl", conf_dir) > COUNTOF(fifo_name)) {
-		fprintf(stderr, "Buffer overflow.\n");
-		exit(EXIT_FAILURE);
+	if (snprintf(fifo_name, COUNTOF(fifo_name), "%s/xosdutilctl", conf_dir) > COUNTOF(fifo_name) ||
+		snprintf(socket_name, COUNTOF(socket_name), "%s/xosdutil.socket", conf_dir) > COUNTOF(socket_name)) {
+		die("Buffer overflow.\n");
 	}
 
 	if (stat(conf_dir, &result) < 0) {
 		if (mkdir(conf_dir, 0755) < 0) {
-			fprintf(stderr, "Cannot create my work directory (%s).\n", conf_dir);
-			perror("mkdir");
-			exit(EXIT_FAILURE);
+			die("Cannot create my work directory (%s).\n", conf_dir);
 		}
 	} else {
 		if (!S_ISDIR(result.st_mode)) {
-			fprintf(stderr, "Please, delete %s and let me use it as my own directory.\n", conf_dir);
-			exit(EXIT_FAILURE);
+			die("Please, delete %s and let me use it as my own directory.\n", conf_dir);
 		}
 	}
 }
@@ -236,22 +235,17 @@ static void open_pipe() {
 	struct stat result;
 	if (stat(fifo_name, &result) < 0) {
 		if (mkfifo(fifo_name, S_IWUSR | S_IRUSR) < 0) {
-			msg("Cannot create control pipe in %s.\n", fifo_name);
-			perror("mkfifo");
-			exit(EXIT_FAILURE);
+			die("Cannot create control pipe in %s.\n", fifo_name);
 		}
 	} else {
 		if (!S_ISFIFO(result.st_mode)) {
-			msg("I have some junk in where I would expect to make my control pipe (%s). Please remove it.\n", fifo_name);
-			exit(EXIT_FAILURE);
+			die("I have some junk in where I would expect to make my control pipe (%s). Please remove it.\n", fifo_name);
 		}
 	}
 
 	pipe_fd = open(fifo_name, O_RDWR | O_NONBLOCK); // O_RDWR because we need at least one writer for select() to work.
 	if (pipe_fd < 0) {
-		perror("open");
-		msg("Failed to open the control pipe at %s.\n", fifo_name);
-		exit(EXIT_FAILURE);
+		die("Failed to open the control pipe at %s.\n", fifo_name);
 	}
 }
 
@@ -280,15 +274,12 @@ static void select_pipe() {
 				if (!capacity) capacity = 1;
 				buffer = realloc(buffer, capacity);
 				if (!buffer) {
-					msg("Ran out of memory resizing command buffer.\n");
-					exit(1);
+					die("Ran out of memory resizing command buffer.\n");
 				}
 			}
 			nbytes = read(pipe_fd, buffer + length, capacity - length);
 			if (nbytes < 0) {
-				msg("Pipe read() failed.\n");
-				perror("read");
-				exit(1);
+				die("Pipe read() failed.\n");
 			} else {
 				length += nbytes;
 				if (length >= capacity) {
@@ -296,8 +287,7 @@ static void select_pipe() {
 					if (!capacity) capacity = 1;
 					buffer = realloc(buffer, capacity);
 					if (!buffer) {
-						msg("Ran out of memory resizing command buffer.\n");
-						exit(1);
+						die("Ran out of memory resizing command buffer.\n");
 					}
 					buffer[length] = '\0';
 				}
@@ -320,14 +310,86 @@ static void select_pipe() {
 	}
 }
 
+static int socket_fd;
+
 static void open_socket() {
-	fprintf(stderr, "open_socket(): not implemented.\n");
-	exit(EXIT_FAILURE);
+	struct stat result;
+	if (stat(socket_name, &result) >= 0) {
+		die("I have some junk in where I would expect to make my control socket (%s). Please remove it.\n", fifo_name);
+	}
+
+	socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (socket_fd < 0) {
+		die("socket() failed\n");
+	}
+	struct sockaddr_un address;
+	bzero(&address, sizeof(address));
+	address.sun_family = AF_UNIX;
+	strncpy(address.sun_path, socket_name, sizeof(address.sun_path));
+
+	if (bind(socket_fd, (struct sockaddr*)&address, sizeof(address)) != 0) {
+		die("bind() failed\n");
+	}
+
+	if (listen(socket_fd, 5) != 0) {
+		die("listen() failed\n");
+	}
+}
+
+static void handle_socket_connection(int fd) {
+	char* buffer = NULL;
+	size_t length = 0, capacity = 0;
+	int nbytes;
+	do {
+		if (length >= capacity) {
+			capacity *= 2;
+			if (!capacity) capacity = 1;
+			buffer = realloc(buffer, capacity);
+			if (!buffer) {
+				die("Ran out of memory resizing command buffer.\n");
+			}
+		}
+		nbytes = read(fd, buffer + length, capacity - length);
+		if (nbytes > 0) {
+			length += nbytes;
+			if (length >= capacity) {
+				capacity *= 2;
+				if (!capacity) capacity = 1;
+				buffer = realloc(buffer, capacity);
+				if (!buffer) {
+					die("Ran out of memory resizing command buffer.\n");
+				}
+				buffer[length] = '\0';
+			}
+			for (int i = 0; i < length; i++) {
+				if (buffer[i] == '\n') {
+					buffer[i] = '\0';
+					parse_command(buffer);
+					memmove(buffer, buffer + i + 1, length - i);
+					length -= (i + 1);
+				}
+			}
+		} else if (!nbytes) {
+			break;
+		}
+	} while (true);
+
+	free(buffer);
+	close(fd);
 }
 
 static void select_socket() {
-	fprintf(stderr, "select_socket(): not implemented.\n");
-	exit(EXIT_FAILURE);
+	int connection;
+	struct sockaddr_un address;
+	socklen_t length;
+	while ((connection = accept(socket_fd, (struct sockaddr*)&address, &length)) > -1) {
+		if (!fork()) {
+			handle_socket_connection(connection);
+		}
+		close(connection);
+	}
+	close(socket_fd);
+	unlink(socket_name);
 }
 
 int main(int argc, const char** argv) {
@@ -341,8 +403,7 @@ int main(int argc, const char** argv) {
 	if (daemonize) {
 		pid = fork();
 		if (pid < 0) {
-			perror("fork");
-			exit(EXIT_FAILURE);
+			die("fork() failed");
 		} else if (pid > 0) {
 			// Parent now forks off.
 			exit(EXIT_SUCCESS);
@@ -373,7 +434,11 @@ int main(int argc, const char** argv) {
 		}
 	}
 
-	unlink(fifo_name);
+	if (use_pipe) {
+		unlink(fifo_name);
+	} else {
+		unlink(socket_name);
+	}
 	/*
 	xosd_set_bar_length(osd, 50);
 	xosd_display(osd, 1, XOSD_percentage, 77);

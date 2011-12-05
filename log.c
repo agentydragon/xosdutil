@@ -12,8 +12,7 @@ static void log_start() {
 	log_file = fopen(name, "w");
 	if (!log_file) {
 		perror("fopen");
-		fprintf(stderr, "Can't open log file!\n");
-		exit(1);
+		die("Can't open log file!\n");
 	}
 }
 
@@ -37,4 +36,22 @@ void msg(const char* fmt, ...) {
 	}
 	vfprintf(log_file, fmt, ap);
 	va_end(ap);
+}
+
+void die(const char* fmt, ...) {
+	va_list ap;
+	va_start(ap, fmt);
+
+	if (debug) {
+		vprintf(fmt, ap);
+		va_end(ap);
+		va_start(ap, fmt);
+	}
+	if (!log_file && !debug) {
+		vfprintf(stderr, fmt, ap);
+	} else {
+		vfprintf(log_file, fmt, ap);
+	}
+	va_end(ap);
+	exit(EXIT_FAILURE);
 }

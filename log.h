@@ -3,5 +3,6 @@
 
 void log_close();
 void msg(const char* fmt, ...);
+void die(const char* fmt, ...);
 
 #endif

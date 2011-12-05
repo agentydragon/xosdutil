@@ -81,8 +81,7 @@ static int tick(void* r) {
 	if (_r && _r->osd) {
 		int pipefd[2];
 		if (pipe(pipefd) != 0) {
-			perror("pipe");
-			exit(EXIT_FAILURE);
+			die("pipe() failed\n");
 		}
 		struct sigaction old_action, new_action;
 		new_action.sa_handler = SIG_IGN;
@@ -92,8 +91,7 @@ static int tick(void* r) {
 		sigaction(SIGCHLD, &new_action, &old_action);
 		pid = fork();
 		if (pid < 0) {
-			perror("fork");
-			exit(EXIT_FAILURE);
+			die("fork() failed\n");
 		} else if (pid > 0) {
 			close(pipefd[1]);
 			int r = 0;
@@ -119,7 +117,7 @@ static int tick(void* r) {
 				msg("Warning: command %s returned %d\n", _r->command, result);
 			}
 			close(pipefd[1]);
-			exit(0);
+			exit(EXIT_SUCCESS);
 		}
 		sigaction(SIGCHLD, &old_action, NULL);
 
