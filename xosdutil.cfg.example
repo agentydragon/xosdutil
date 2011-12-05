@@ -1,3 +1,5 @@
+use_pipe = true;
+
 display:
 {
 	font = "-b&h-luxi mono-bold-r-*-*-80-*-*-*-*-*-*";

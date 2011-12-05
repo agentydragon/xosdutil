@@ -9,6 +9,7 @@
 #include "xosdutil.h"
 #include "renderers/exec.h"
 #include "log.h"
+#include "control_pipe.h"
 
 typedef struct exec_renderer_data {
 	xosd* osd;
@@ -110,7 +111,7 @@ static int tick(void* r) {
 			close(pipefd[0]);
 			int old_stdout = dup(1);
 			dup2(pipefd[1], 1);
-			close(pipe_fd);
+			close(pipe_fd); // TODO: close the socket!
 			int result = system(_r->command);
 			if (WEXITSTATUS(result) != 0) { // TODO: somehow buggy
 				dup2(old_stdout, 1);

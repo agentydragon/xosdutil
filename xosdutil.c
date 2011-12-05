@@ -4,18 +4,15 @@
 #include <locale.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <string.h>
-#include <memory.h>
 #include <pwd.h>
 #include <string.h>
 #include <libconfig.h>
+#include "control_socket.h"
+#include "control_pipe.h"
 #include "renderers/time.h"
 #include "renderers/uptime.h"
 #include "renderers/battery.h"
@@ -27,14 +24,11 @@
 #define COUNTOF(x) (sizeof(x)/sizeof(*x))
 
 static bool run = true;
-int pipe_fd;
 static xosd *osd;
 static renderer **renderers = NULL;
 static const char **renderer_commands = NULL;
 static int* renderer_durations = NULL;
 static int renderers_count = 0;
-static char fifo_name[100];
-static char socket_name[100];
 static char conf_file[100];
 char conf_dir[100];
 bool debug = true;
@@ -45,7 +39,7 @@ static int outline_offset = 2;
 static const char* outline_color = "black";
 static int vertical_offset = 48;
 static bool daemonize = false;
-static bool use_pipe = true;
+static bool use_pipe = false;
 
 static void sigchld(int signal) {
 	int status;
@@ -153,7 +147,9 @@ static int parse_command_setting(config_setting_t *settings) {
 
 // TODO
 static void parse_configuration(config_t *config) {
-	// TODO: load "use_pipe"
+	int result;
+	config_lookup_bool(config, "use_pipe", &result);
+	use_pipe = result;
 
 	config_setting_t* section = config_lookup(config, "display");
 	const char* buffer;
@@ -213,7 +209,7 @@ static void run_renderer(renderer* r, int time, const char* arguments) {
 	renderer_hide(r);
 }
 
-static void parse_command(const char* command) {
+void parse_command(const char* command) {
 	int cnt = 0;
 	while (command[cnt] && command[cnt] != ' ') cnt++;
 	msg("command received: [%s]\n", command);
@@ -229,167 +225,6 @@ static void parse_command(const char* command) {
 			}
 		}
 	}
-}
-
-static void open_pipe() {
-	struct stat result;
-	if (stat(fifo_name, &result) < 0) {
-		if (mkfifo(fifo_name, S_IWUSR | S_IRUSR) < 0) {
-			die("Cannot create control pipe in %s.\n", fifo_name);
-		}
-	} else {
-		if (!S_ISFIFO(result.st_mode)) {
-			die("I have some junk in where I would expect to make my control pipe (%s). Please remove it.\n", fifo_name);
-		}
-	}
-
-	pipe_fd = open(fifo_name, O_RDWR | O_NONBLOCK); // O_RDWR because we need at least one writer for select() to work.
-	if (pipe_fd < 0) {
-		die("Failed to open the control pipe at %s.\n", fifo_name);
-	}
-}
-
-static void select_pipe() {
-	static size_t length = 0, capacity = 0;
-	static char* buffer = NULL;
-	size_t nbytes = 0;
-	fd_set readfds, writefds, exceptfds;
-	struct timeval timeout;
-	
-	FD_ZERO(&readfds);
-	FD_ZERO(&writefds);
-	FD_ZERO(&exceptfds);
-
-	FD_SET(pipe_fd, &readfds); // We want to check if the control pipe is ready for reading.
-
-	timeout.tv_sec = 600;
-	timeout.tv_usec = 0; // 60 seconds
-
-	msg("select\n");
-	switch (select(pipe_fd + 1, &readfds, &writefds, &exceptfds, &timeout)) {
-		case 1:
-			// The file descriptor is now ready to read.
-			if (length >= capacity) {
-				capacity *= 2;
-				if (!capacity) capacity = 1;
-				buffer = realloc(buffer, capacity);
-				if (!buffer) {
-					die("Ran out of memory resizing command buffer.\n");
-				}
-			}
-			nbytes = read(pipe_fd, buffer + length, capacity - length);
-			if (nbytes < 0) {
-				die("Pipe read() failed.\n");
-			} else {
-				length += nbytes;
-				if (length >= capacity) {
-					capacity *= 2;
-					if (!capacity) capacity = 1;
-					buffer = realloc(buffer, capacity);
-					if (!buffer) {
-						die("Ran out of memory resizing command buffer.\n");
-					}
-					buffer[length] = '\0';
-				}
-				for (int i = 0; i < length; i++) {
-					if (buffer[i] == '\n') {
-						buffer[i] = '\0';
-						parse_command(buffer);
-						memmove(buffer, buffer + i + 1, length - i);
-						length -= (i + 1);
-					}
-				}
-			}
-			break;
-		case 0:
-			// TODO: How?
-			break;
-		case -1:
-			perror("select");
-			break;
-	}
-}
-
-static int socket_fd;
-
-static void open_socket() {
-	struct stat result;
-	if (stat(socket_name, &result) >= 0) {
-		die("I have some junk in where I would expect to make my control socket (%s). Please remove it.\n", fifo_name);
-	}
-
-	socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);
-	if (socket_fd < 0) {
-		die("socket() failed\n");
-	}
-	struct sockaddr_un address;
-	bzero(&address, sizeof(address));
-	address.sun_family = AF_UNIX;
-	strncpy(address.sun_path, socket_name, sizeof(address.sun_path));
-
-	if (bind(socket_fd, (struct sockaddr*)&address, sizeof(address)) != 0) {
-		die("bind() failed\n");
-	}
-
-	if (listen(socket_fd, 5) != 0) {
-		die("listen() failed\n");
-	}
-}
-
-static void handle_socket_connection(int fd) {
-	char* buffer = NULL;
-	size_t length = 0, capacity = 0;
-	int nbytes;
-	do {
-		if (length >= capacity) {
-			capacity *= 2;
-			if (!capacity) capacity = 1;
-			buffer = realloc(buffer, capacity);
-			if (!buffer) {
-				die("Ran out of memory resizing command buffer.\n");
-			}
-		}
-		nbytes = read(fd, buffer + length, capacity - length);
-		if (nbytes > 0) {
-			length += nbytes;
-			if (length >= capacity) {
-				capacity *= 2;
-				if (!capacity) capacity = 1;
-				buffer = realloc(buffer, capacity);
-				if (!buffer) {
-					die("Ran out of memory resizing command buffer.\n");
-				}
-				buffer[length] = '\0';
-			}
-			for (int i = 0; i < length; i++) {
-				if (buffer[i] == '\n') {
-					buffer[i] = '\0';
-					parse_command(buffer);
-					memmove(buffer, buffer + i + 1, length - i);
-					length -= (i + 1);
-				}
-			}
-		} else if (!nbytes) {
-			break;
-		}
-	} while (true);
-
-	free(buffer);
-	close(fd);
-}
-
-static void select_socket() {
-	int connection;
-	struct sockaddr_un address;
-	socklen_t length;
-	while ((connection = accept(socket_fd, (struct sockaddr*)&address, &length)) > -1) {
-		if (!fork()) {
-			handle_socket_connection(connection);
-		}
-		close(connection);
-	}
-	close(socket_fd);
-	unlink(socket_name);
 }
 
 int main(int argc, const char** argv) {
