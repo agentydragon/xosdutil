@@ -214,7 +214,8 @@ void parse_command(const char* command) {
 	while (command[cnt] && command[cnt] != ' ') cnt++;
 	msg("command received: [%s]\n", command);
 
-	if (strcmp(command, "exit") == 0) {
+	if (strcmp(command, "exit") == 0 || strcmp(command, "quit") == 0 || strcmp(command, "end") == 0) {
+		msg("quitting...\n");
 		run = false;
 	} else {
 		for (int i = 0; i < renderers_count; i++) {
@@ -261,19 +262,18 @@ int main(int argc, const char** argv) {
 		while (run) {
 			select_pipe();
 		}
+
+		close_pipe();
 	} else {
 		open_socket();
 
 		while (run) {
 			select_socket();
 		}
+
+		close_socket();
 	}
 
-	if (use_pipe) {
-		unlink(fifo_name);
-	} else {
-		unlink(socket_name);
-	}
 	/*
 	xosd_set_bar_length(osd, 50);
 	xosd_display(osd, 1, XOSD_percentage, 77);

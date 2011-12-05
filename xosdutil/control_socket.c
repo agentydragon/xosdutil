@@ -80,12 +80,13 @@ void select_socket() {
 	int connection;
 	struct sockaddr_un address;
 	socklen_t length;
-	while ((connection = accept(socket_fd, (struct sockaddr*)&address, &length)) > -1) {
-		if (!fork()) {
-			handle_socket_connection(connection);
-		}
+	if ((connection = accept(socket_fd, (struct sockaddr*)&address, &length)) > -1) {
+		handle_socket_connection(connection);
 		close(connection);
 	}
+}
+
+void close_socket() {
 	close(socket_fd);
 	unlink(socket_name);
 }

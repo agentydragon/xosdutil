@@ -91,3 +91,6 @@ void select_pipe() {
 	}
 }
 
+void close_pipe() {
+	unlink(fifo_name);
+}

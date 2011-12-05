@@ -58,6 +58,9 @@ int main(int argc, char** argv) {
 	if (argc > 1) {
 		for (i = 1; i < argc; i++) {
 			write(socket_fd, argv[i], strlen(argv[i]));
+			if (i != argc - 1) {
+				write(socket_fd, " ", 1);
+			}
 		}
 	} else {
 		do {
@@ -70,9 +73,9 @@ int main(int argc, char** argv) {
 				break;
 			}
 		} while (1);
-		// after everything is sent, write a dummy newline.
-		write(socket_fd, "\n", 1);
 	}
+	// after everything is sent, write a dummy newline.
+	write(socket_fd, "\n", 1);
 	close(socket_fd);
 	return 0;
 }
