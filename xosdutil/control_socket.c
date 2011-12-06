@@ -3,15 +3,22 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <assert.h>
+
 #include "xosdutil.h"
 #include "log.h"
 #include "control_socket.h"
 
 static int socket_fd;
 char socket_name[100];
+static bool socket_open;
 
 void open_socket() {
 	struct stat result;
+	if (socket_open) {
+		return;
+	}
+
 	if (stat(socket_name, &result) >= 0) {
 		die("I have some junk in where I would expect to make my control socket (%s). Please remove it.\n", socket_name);
 	}
@@ -32,6 +39,7 @@ void open_socket() {
 	if (listen(socket_fd, 5) != 0) {
 		die("listen() failed\n");
 	}
+	socket_open = true;
 }
 
 static void handle_socket_connection(int fd) {
@@ -80,6 +88,8 @@ void select_socket() {
 	int connection;
 	struct sockaddr_un address;
 	socklen_t length;
+
+	assert(socket_open);
 	if ((connection = accept(socket_fd, (struct sockaddr*)&address, &length)) > -1) {
 		handle_socket_connection(connection);
 		close(connection);
@@ -87,7 +97,14 @@ void select_socket() {
 }
 
 void close_socket() {
+	if (!socket_open) {
+		return;
+	}
 	close(socket_fd);
+	socket_open = false;
+}
+
+void delete_socket() {
 	unlink(socket_name);
 }
 

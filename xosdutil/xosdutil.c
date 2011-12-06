@@ -40,10 +40,20 @@ static const char* outline_color = "black";
 static int vertical_offset = 48;
 static bool daemonize = false;
 static bool use_pipe = false;
+static bool is_master = true;
 
 static void sigchld(int signal) {
 	int status;
 	wait(&status);
+}
+
+static void sigterm(int signal) {
+	// On SIGTERM, just exit normally (and invoke normal atexit()).
+	exit(EXIT_SUCCESS);
+}
+
+void after_fork() {
+	is_master = false;
 }
 
 int create_xosd(xosd** osd, int size) {
@@ -228,6 +238,22 @@ void parse_command(const char* command) {
 	}
 }
 
+static void close_control_channels() {
+	if (use_pipe) {
+		close_pipe();
+	} else {
+		close_socket();
+	}
+	if (is_master) {
+		msg("Deleting socket and/or pipe...\n");
+		if (use_pipe) {
+			delete_pipe();
+		} else {
+			delete_socket();
+		}
+	}
+}
+
 int main(int argc, const char** argv) {
 	int f = 0;
 	pid_t pid;
@@ -251,27 +277,28 @@ int main(int argc, const char** argv) {
 	
 	load_configuration();
 
-	struct sigaction sigchld_action;
-	bzero(&sigchld_action, sizeof(struct sigaction));
-	sigchld_action.sa_handler = &sigchld;
-	sigaction(SIGCHLD, &sigchld_action, NULL);
+	struct sigaction action;
+	bzero(&action, sizeof(struct sigaction));
+	action.sa_handler = &sigchld;
+	sigaction(SIGCHLD, &action, NULL);
 
+	bzero(&action, sizeof(struct sigaction));
+	action.sa_handler = &sigterm;
+	sigaction(SIGTERM, &action, NULL);
+
+	atexit(close_control_channels);
 	if (use_pipe) {
 		open_pipe();
 
 		while (run) {
 			select_pipe();
 		}
-
-		close_pipe();
 	} else {
 		open_socket();
 
 		while (run) {
 			select_socket();
 		}
-
-		close_socket();
 	}
 
 	/*

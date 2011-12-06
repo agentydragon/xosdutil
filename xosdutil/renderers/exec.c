@@ -86,11 +86,11 @@ static int tick(void* r) {
 		}
 		struct sigaction old_action, new_action;
 		new_action.sa_handler = SIG_IGN;
-		// TODO: vzniknou zombie!
 		sigemptyset(&new_action.sa_mask);
 		new_action.sa_flags = 0;
 		sigaction(SIGCHLD, &new_action, &old_action);
 		pid = fork();
+		after_fork();
 		if (pid < 0) {
 			die("fork() failed\n");
 		} else if (pid > 0) {
@@ -111,7 +111,6 @@ static int tick(void* r) {
 			close(pipefd[0]);
 			int old_stdout = dup(1);
 			dup2(pipefd[1], 1);
-			close(pipe_fd); // TODO: close the socket!
 			int result = system(_r->command);
 			if (WEXITSTATUS(result) != 0) { // TODO: somehow buggy
 				dup2(old_stdout, 1);

@@ -4,16 +4,22 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <memory.h>
+#include <assert.h>
 
 #include "xosdutil.h"
 #include "log.h"
 #include "control_pipe.h"
 
-int pipe_fd;
+static int pipe_fd;
 char fifo_name[100];
+static bool pipe_open = false;
 
 void open_pipe() {
 	struct stat result;
+	if (pipe_open) {
+		return;
+	}
+
 	if (stat(fifo_name, &result) < 0) {
 		if (mkfifo(fifo_name, S_IWUSR | S_IRUSR) < 0) {
 			die("Cannot create control pipe in %s.\n", fifo_name);
@@ -28,6 +34,8 @@ void open_pipe() {
 	if (pipe_fd < 0) {
 		die("Failed to open the control pipe at %s.\n", fifo_name);
 	}
+
+	pipe_open = true;
 }
 
 void select_pipe() {
@@ -36,6 +44,8 @@ void select_pipe() {
 	size_t nbytes = 0;
 	fd_set readfds, writefds, exceptfds;
 	struct timeval timeout;
+
+	assert(pipe_open);
 	
 	FD_ZERO(&readfds);
 	FD_ZERO(&writefds);
@@ -92,5 +102,13 @@ void select_pipe() {
 }
 
 void close_pipe() {
+	if (!pipe_open) {
+		return;
+	}
+	close(pipe_fd);
+	pipe_open = false;
+}
+
+void delete_pipe() {
 	unlink(fifo_name);
 }
