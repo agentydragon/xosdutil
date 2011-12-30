@@ -105,6 +105,9 @@ void close_socket() {
 }
 
 void delete_socket() {
-	unlink(socket_name);
+	msg("deleting control socket...");
+	if (unlink(socket_name) != 0) {
+		msg("unlink(%s) failed", socket_name);
+	}
 }
 

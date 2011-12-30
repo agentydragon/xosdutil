@@ -41,13 +41,15 @@ static int vertical_offset = 48;
 static bool daemonize = false;
 static bool use_pipe = false;
 static bool is_master = true;
+static bool control_channels_open = false;
 
 static void sigchld(int signal) {
 	int status;
 	wait(&status);
 }
 
-static void sigterm(int signal) {
+static void exit_signal(int signal) {
+	msg("received signal %d, exitting normally\n", signal);
 	// On SIGTERM, just exit normally (and invoke normal atexit()).
 	exit(EXIT_SUCCESS);
 }
@@ -239,19 +241,51 @@ void parse_command(const char* command) {
 }
 
 static void close_control_channels() {
+	if (!control_channels_open) {
+		return;
+	}
+	msg("close_control_channels()\n");
 	if (use_pipe) {
 		close_pipe();
 	} else {
 		close_socket();
 	}
 	if (is_master) {
+		control_channels_open = false;
 		msg("Deleting socket and/or pipe...\n");
 		if (use_pipe) {
 			delete_pipe();
 		} else {
 			delete_socket();
 		}
+	} else {
+		msg("exitting process is slave, not deleting control channels...\n");
 	}
+}
+
+static void setup_signals() {
+	int f;
+	struct sigaction action;
+	action.sa_handler = &sigchld;
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
+	if ((f = sigaction(SIGCHLD, &action, NULL)) != 0) {
+		goto err;
+	}
+
+	action.sa_handler = &exit_signal;
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
+	if ((f = sigaction(SIGTERM, &action, NULL)) != 0 ||
+		(f = sigaction(SIGINT, &action, NULL)) != 0) {
+		goto err;
+	}
+
+	return;
+
+err:
+	perror("sigaction");
+	die("cannot setup signals (sigaction returned %d)", f);
 }
 
 int main(int argc, const char** argv) {
@@ -277,24 +311,19 @@ int main(int argc, const char** argv) {
 	
 	load_configuration();
 
-	struct sigaction action;
-	bzero(&action, sizeof(struct sigaction));
-	action.sa_handler = &sigchld;
-	sigaction(SIGCHLD, &action, NULL);
-
-	bzero(&action, sizeof(struct sigaction));
-	action.sa_handler = &sigterm;
-	sigaction(SIGTERM, &action, NULL);
-
+	setup_signals();
 	atexit(close_control_channels);
+
 	if (use_pipe) {
 		open_pipe();
+		control_channels_open = true;
 
 		while (run) {
 			select_pipe();
 		}
 	} else {
 		open_socket();
+		control_channels_open = true;
 
 		while (run) {
 			select_socket();

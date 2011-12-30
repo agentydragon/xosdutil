@@ -90,7 +90,6 @@ static int tick(void* r) {
 		new_action.sa_flags = 0;
 		sigaction(SIGCHLD, &new_action, &old_action);
 		pid = fork();
-		after_fork();
 		if (pid < 0) {
 			die("fork() failed\n");
 		} else if (pid > 0) {
@@ -108,6 +107,7 @@ static int tick(void* r) {
 			msg("over.\n");
 			buffer[buffer_length] = '\0';
 		} else {
+			after_fork();
 			close(pipefd[0]);
 			int old_stdout = dup(1);
 			dup2(pipefd[1], 1);

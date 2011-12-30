@@ -110,5 +110,8 @@ void close_pipe() {
 }
 
 void delete_pipe() {
-	unlink(fifo_name);
+	msg("deleting control pipe...");
+	if (unlink(fifo_name) != 0) {
+		msg("unlink(%s) failed", fifo_name);
+	}
 }
