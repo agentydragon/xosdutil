@@ -20,7 +20,11 @@ void open_socket() {
 	}
 
 	if (stat(socket_name, &result) >= 0) {
-		die("I have some junk in where I would expect to make my control socket (%s). Please remove it.\n", socket_name);
+		msg("I have some junk in where I would expect to make my control socket (%s). Removing.\n", socket_name);
+		unlink(socket_name);
+		if (stat(socket_name, &result) >= 0) {
+			die("Cannot delete what is in place of my control socket.");
+		}
 	}
 
 	socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);

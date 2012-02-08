@@ -26,7 +26,11 @@ void open_pipe() {
 		}
 	} else {
 		if (!S_ISFIFO(result.st_mode)) {
-			die("I have some junk in where I would expect to make my control pipe (%s). Please remove it.\n", fifo_name);
+			die("I have some junk in where I would expect to make my control pipe (%s). Removing.\n", fifo_name);
+			unlink(fifo_name);
+			if (stat(fifo_name, &result) >= 0) {
+				die("Cannot delete what is in place of my control pipe.");
+			}
 		}
 	}
 
