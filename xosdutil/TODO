@@ -1,4 +1,5 @@
 TODOs:
+- Allow choosing other installation prefix than /usr/local/bin.
 - Proper takebacks in renderer constructors.
 - Redirect stdout to log file in child process.
 - Fork off when launching renderers.

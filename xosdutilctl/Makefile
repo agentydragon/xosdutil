@@ -12,6 +12,9 @@ obj/%.o: %.c
 clean:
 	@rm bin/xosdutilctl $(OBJFILES)
 
+install:
+	cp bin/xosdutilctl /usr/local/bin/xosdutilctl
+
 all: bin/xosdutilctl
 
 .PHONY: clean

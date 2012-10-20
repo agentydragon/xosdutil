@@ -2,6 +2,8 @@ xosdutil is supposed to be a daemon for displaying notifications and stuff like 
 battery status using libxosd. Useful for small displays, as you can conserve space you'd normally use for
 time display and similar stuff. It is controlled by writing to ~/.xosdutil/xosdutilctl.
 
+Make it using "make", install it using "sudo make install".
+
 I use it by mapping commands like "echo 'time' > ~/.xosdutil/xosdutilctl" to keys (Win-C) in my XMonad
 configuration.
 
